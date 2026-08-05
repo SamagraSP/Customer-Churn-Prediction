@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Churn Prediction</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Poppins',sans-serif;
+}
+
+body{
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.18), transparent 22%),
+        linear-gradient(135deg,#1D4ED8,#4F46E5,#7C3AED,#06B6D4);
+    overflow-x:hidden;
+    position:relative;
+    padding:110px 16px 80px;
+}
+
+body::before,
+body::after{
+    content:'';
+    position:absolute;
+    border-radius:50%;
+    background:rgba(255,255,255,.08);
+    z-index:0;
+}
+
+body::before{
+    width:520px;
+    height:520px;
+    top:-180px;
+    left:-150px;
+}
+
+body::after{
+    width:460px;
+    height:460px;
+    right:-100px;
+    bottom:-160px;
+}
+
+.header,
+.footer{
+    width:100%;
+    text-align:center;
+    position:relative;
+    z-index:2;
+    color:#fff;
+}
+
+.header{
+    margin-bottom:24px;
+}
+
+.header .badge{
+    display:inline-block;
+    padding:8px 14px;
+    border-radius:999px;
+    background:rgba(255,255,255,.15);
+    border:1px solid rgba(255,255,255,.22);
+    font-size:12px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    margin-bottom:12px;
+}
+
+.header h1{
+    font-size:clamp(30px,4vw,42px);
+    font-weight:700;
+}
+
+.header p{
+    margin-top:10px;
+    font-size:15px;
+    color:#E2E8F0;
+}
+
+.container{
+    width:100%;
+    max-width:980px;
+    position:relative;
+    z-index:2;
+}
+
+.card{
+    background:rgba(255,255,255,.14);
+    backdrop-filter:blur(18px);
+    border:1px solid rgba(255,255,255,.28);
+    border-radius:28px;
+    padding:32px;
+    box-shadow:0 24px 60px rgba(15,23,42,.3);
+}
+
+.title{
+    text-align:center;
+    color:#fff;
+    font-size:32px;
+    font-weight:700;
+    margin-bottom:8px;
+}
+
+.subtitle{
+    text-align:center;
+    color:#E8EAF6;
+    margin-bottom:28px;
+    font-size:14px;
+}
+
+.form-scroll{
+    max-height:520px;
+    overflow-y:auto;
+    overflow-x:hidden;
+    padding-right:10px;
+}
+
+.form-scroll::-webkit-scrollbar{
+    width:8px;
+}
+
+.form-scroll::-webkit-scrollbar-thumb{
+    background:#67E8F9;
+    border-radius:999px;
+}
+
+.form-scroll::-webkit-scrollbar-track{
+    background:rgba(255,255,255,.12);
+}
+
+.form-title{
+    position:sticky;
+    top:0;
+    background:rgba(79,70,229,.9);
+    backdrop-filter:blur(10px);
+    color:white;
+    padding:12px;
+    text-align:center;
+    border-radius:12px;
+    margin-bottom:18px;
+    font-weight:600;
+    z-index:2;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+}
+
+.form-group{
+    margin-bottom:16px;
+}
+
+label{
+    display:block;
+    color:#F8FAFC;
+    margin-bottom:8px;
+    font-size:14px;
+    font-weight:500;
+}
+
+input,
+select{
+    width:100%;
+    padding:14px;
+    border:none;
+    outline:none;
+    border-radius:14px;
+    background:rgba(255,255,255,.2);
+    color:#fff;
+    font-size:15px;
+    transition:.25s ease;
+}
+
+input::placeholder{
+    color:#ECFDF5;
+}
+
+select option{
+    color:#0f172a;
+}
+
+input:focus,
+select:focus{
+    background:rgba(255,255,255,.34);
+    box-shadow:0 0 0 3px rgba(103,232,249,.35);
+}
+
+button{
+    width:100%;
+    margin-top:24px;
+    padding:16px 18px;
+    border:none;
+    border-radius:16px;
+    background:linear-gradient(135deg,#00E5FF,#00C853);
+    color:white;
+    font-size:18px;
+    font-weight:700;
+    cursor:pointer;
+    transition:transform .25s ease, box-shadow .25s ease;
+}
+
+button:hover{
+    transform:translateY(-3px) scale(1.01);
+    box-shadow:0 16px 35px rgba(0,0,0,.28);
+}
+
+.result-wrapper{
+    width:100%;
+    max-width:980px;
+    margin:24px auto 0;
+    position:relative;
+    z-index:2;
+}
+
+.result-shell{
+    display:none;
+}
+
+.result-shell.visible{
+    display:block;
+}
+
+.result-panel{
+    margin-top:0;
+    padding:28px;
+    border-radius:24px;
+    color:white;
+    border:1px solid rgba(255,255,255,.24);
+    box-shadow:0 18px 44px rgba(15,23,42,.28);
+    position:relative;
+    overflow:hidden;
+}
+
+.result-panel::before{
+    content:'';
+    position:absolute;
+    inset:0;
+    background:linear-gradient(120deg, rgba(255,255,255,.25), transparent 55%);
+    pointer-events:none;
+}
+
+.result-panel.active{
+    display:block;
+    animation:fadeUp .5s ease;
+}
+
+.result-panel.low-risk{
+    background:linear-gradient(135deg,#059669,#10B981);
+}
+
+.result-panel.medium-risk{
+    background:linear-gradient(135deg,#D97706,#F59E0B);
+}
+
+.result-panel.high-risk{
+    background:linear-gradient(135deg,#DC2626,#EF4444);
+}
+
+.result-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+    margin-bottom:14px;
+    position:relative;
+    z-index:1;
+}
+
+.result-header h3{
+    font-size:22px;
+    font-weight:700;
+}
+
+.result-badge{
+    padding:7px 12px;
+    border-radius:999px;
+    background:rgba(255,255,255,.24);
+    font-size:13px;
+    font-weight:600;
+}
+
+.result-summary{
+    position:relative;
+    z-index:1;
+    font-size:15px;
+    line-height:1.7;
+}
+
+.result-intro{
+    margin-top:8px;
+    font-size:15px;
+    line-height:1.7;
+    position:relative;
+    z-index:1;
+}
+
+.result-grid{
+    display:grid;
+    grid-template-columns:1.2fr 0.8fr;
+    gap:14px;
+    margin-top:18px;
+    position:relative;
+    z-index:1;
+}
+
+.result-card{
+    background:rgba(255,255,255,.16);
+    border-radius:16px;
+    padding:16px;
+}
+
+.result-card h4{
+    font-size:16px;
+    margin-bottom:8px;
+}
+
+.result-list{
+    display:grid;
+    gap:8px;
+    margin-top:10px;
+    list-style:none;
+}
+
+.result-list li{
+    background:rgba(255,255,255,.12);
+    padding:10px 12px;
+    border-radius:12px;
+    font-size:14px;
+    line-height:1.5;
+}
+
+.result-meta{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:10px;
+    margin-top:16px;
+    position:relative;
+    z-index:1;
+}
+
+.meta-card{
+    background:rgba(255,255,255,.16);
+    padding:12px;
+    border-radius:14px;
+}
+
+.progress-strip{
+    margin-top:16px;
+    height:10px;
+    border-radius:999px;
+    background:rgba(255,255,255,.2);
+    overflow:hidden;
+    position:relative;
+    z-index:1;
+}
+
+.progress-bar{
+    height:100%;
+    width:50%;
+    border-radius:999px;
+    background:rgba(255,255,255,.85);
+}
+
+.meta-card span{
+    display:block;
+    font-size:12px;
+    opacity:.85;
+    margin-bottom:6px;
+}
+
+.meta-card strong{
+    font-size:15px;
+}
+
+.footer{
+    margin-top:22px;
+    font-size:14px;
+    color:#EAF4FF;
+}
+
+.footer b{
+    color:#67E8F9;
+}
+
+@keyframes fadeUp {
+    from {
+        opacity:0;
+        transform:translateY(12px);
+    }
+    to {
+        opacity:1;
+        transform:translateY(0);
+    }
+}
+
+@media (max-width: 700px){
+    .grid{
+        grid-template-columns:1fr;
+    }
+
+    .card{
+        padding:24px;
+    }
+
+    .title{
+        font-size:26px;
+    }
+
+    .result-header{
+        flex-direction:column;
+        align-items:flex-start;
+    }
+}
+</style>
+
+</head>
+<body>
+
+<header class="header">
+    <div class="badge">ML Retention Dashboard</div>
+    <h1>📊 Customer Churn Prediction System</h1>
+    <p>
+        Machine learning based customer retention analysis with telecom profile insights.
+    </p>
+</header>
+
+<div class="container">
+
+<div class="card">
+
+<h1 class="title">Customer Churn Prediction</h1>
+
+<p class="subtitle">
+    Fill in the details below to evaluate churn likelihood and review the prediction summary.
+</p>
+
+<form id="churn-form" method="POST">
+
+<div class="form-scroll">
+    {% csrf_token %}
+
+    <div class="form-title">
+        Customer Information
+    </div>
+
+    <div class="grid">
+
+        <div class="form-group">
+            <label>Customer ID</label>
+            <input type="text" name="customerID" placeholder="Customer ID">
+        </div>
+
+        <div class="form-group">
+            <label>Gender</label>
+            <select name="gender">
+                <option>Male</option>
+                <option>Female</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Senior Citizen</label>
+            <select name="SeniorCitizen">
+                <option value="0">No</option>
+                <option value="1">Yes</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Partner</label>
+            <select name="Partner">
+                <option>Yes</option>
+                <option>No</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Dependents</label>
+            <select name="Dependents">
+                <option>Yes</option>
+                <option>No</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Tenure (Months)</label>
+            <input type="number" name="tenure" placeholder="Months">
+        </div>
+
+        <div class="form-group">
+            <label>Phone Service</label>
+            <select name="phoneService">
+                <option>Yes</option>
+                <option>No</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Multiple Lines</label>
+            <select name="multipleLines">
+                <option>Yes</option>
+                <option>No</option>
+                <option>No phone service</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Internet Service</label>
+            <select name="internetService">
+                <option>DSL</option>
+                <option>Fiber optic</option>
+                <option>No</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Online Security</label>
+            <select name="onlineSecurity">
+                <option>Yes</option>
+                <option>No</option>
+                <option>No internet service</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Online Backup</label>
+            <select name="onlineBackup">
+                <option>Yes</option>
+                <option>No</option>
+                <option>No internet service</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Device Protection</label>
+            <select name="deviceProtection">
+                <option>Yes</option>
+                <option>No</option>
+                <option>No internet service</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Tech Support</label>
+            <select name="techSupport">
+                <option>Yes</option>
+                <option>No</option>
+                <option>No internet service</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Streaming TV</label>
+            <select name="streamingTv">
+                <option>Yes</option>
+                <option>No</option>
+                <option>No internet service</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Streaming Movies</label>
+            <select name="streamingMovies">
+                <option>Yes</option>
+                <option>No</option>
+                <option>No internet service</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Contract</label>
+            <select name="contract">
+                <option>Month-to-month</option>
+                <option>One year</option>
+                <option>Two year</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Paperless Billing</label>
+            <select name="paperlessBilling">
+                <option>Yes</option>
+                <option>No</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Payment Method</label>
+            <select name="paymentMethod">
+                <option>Electronic check</option>
+                <option>Mailed check</option>
+                <option>Bank transfer (automatic)</option>
+                <option>Credit card (automatic)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Monthly Charges</label>
+            <input type="number" step="0.01" name="monthlyCharges" placeholder="Monthly Charges">
+        </div>
+
+        <div class="form-group">
+            <label>Total Charges</label>
+            <input type="number" step="0.01" name="totalCharges" placeholder="Total Charges">
+        </div>
+
+    </div>
+</div>
+
+<button type="submit">
+    🔮 Predict Churn
+</button>
+
+</form>
+
+</div>
+
+{% if show_result %}
+<div class="result-wrapper">
+    <div id="result-shell" class="result-shell visible">
+        <div id="prediction-panel" class="result-panel {{ risk_class }} active">
+            <div class="result-header">
+                <h3 id="prediction-text">Prediction: {{ risk_label }}</h3>
+                <div id="risk-badge" class="result-badge">{{ risk_label }}</div>
+            </div>
+
+            <p id="prediction-summary" class="result-summary">
+                {{ summary }}
+            </p>
+
+            <p class="result-intro">
+                {% if risk_label == 'High Risk' %}
+                    This profile shows a strong likelihood of churn, so retention action should be prioritized immediately.
+                {% elif risk_label == 'Medium Risk' %}
+                    This customer needs proactive engagement to reduce the risk of cancellation.
+                {% else %}
+                    This profile appears stable and should benefit from continued good service and loyalty support.
+                {% endif %}
+            </p>
+
+            <div class="result-grid">
+                <div class="result-card">
+                    <h4>Why this score matters</h4>
+                    <ul class="result-list">
+                        <li><strong>Confidence:</strong> {{ confidence }}% </li>
+                        <li><strong>Recommended action:</strong> {{ recommendation }}</li>
+                        <li><strong>Customer focus:</strong> Review the contract and service experience for better retention.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div style="background:rgba(255,255,255,.12); border-radius:16px; padding:18px; margin-top:16px;">
+                <h4 style="margin-bottom:16px;">Customer vs Average Churner Comparison</h4>
+                <canvas id="churnChart" style="max-height:300px;"></canvas>
+            </div>
+
+            <div class="progress-strip">
+                <div id="progress-bar" class="progress-bar" style="width: {{ confidence }}%;"></div>
+            </div>
+
+            <div class="result-meta">
+                <div class="meta-card">
+                    <span>Customer ID</span>
+                    <strong id="customer-id">{{ customer_id }}</strong>
+                </div>
+                <div class="meta-card">
+                    <span>Contract</span>
+                    <strong id="contract-type">{{ contract }}</strong>
+                </div>
+                <div class="meta-card">
+                    <span>Monthly Charges</span>
+                    <strong id="monthly-display">{{ monthly_charges }}</strong>
+                </div>
+                <div class="meta-card">
+                    <span>Internet Service</span>
+                    <strong id="internet-display">{{ internet_service }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+</div>
+
+<footer class="footer">
+    <p>
+        Customer Churn Prediction System | Machine Learning Project |
+        Built using <b>Django</b>, <b>Python</b>, <b>Scikit-learn</b>
+    </p>
+</footer>
+
+<script>
+    const forecastForm = document.getElementById('churn-form');
+    const resultShell = document.getElementById('result-shell');
+
+    if (resultShell) {
+        resultShell.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+        });
+    }
+
+    forecastForm.addEventListener('submit', function () {
+        if (resultShell) {
+            resultShell.classList.add('visible');
+        }
+    });
+
+    // Chart.js - Customer vs Average Churner Bar Chart
+    const chartCanvas = document.getElementById('churnChart');
+    if (chartCanvas) {
+        const chartData = {{ chart_data|safe }};
+        
+        if (chartData) {
+            const ctx = chartCanvas.getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Monthly Charges ($)', 'Tenure (Months)'],
+                    datasets: [
+                        {
+                            label: 'Current Customer',
+                            data: [
+                                chartData.monthly_charges.customer,
+                                chartData.tenure.customer
+                            ],
+                            backgroundColor: [
+                                'rgba(103, 232, 249, 0.8)',
+                                'rgba(103, 232, 249, 0.8)'
+                            ],
+                            borderColor: [
+                                '#67E8F9',
+                                '#67E8F9'
+                            ],
+                            borderWidth: 2,
+                            borderRadius: 8,
+                            barPercentage: 0.7,
+                            categoryPercentage: 0.8
+                        },
+                        {
+                            label: 'Avg Churner Profile',
+                            data: [
+                                chartData.monthly_charges.average_churner,
+                                chartData.tenure.average_churner
+                            ],
+                            backgroundColor: [
+                                'rgba(251, 191, 36, 0.9)',
+                                'rgba(251, 191, 36, 0.9)'
+                            ],
+                            borderColor: [
+                                '#FBBF24',
+                                '#FBBF24'
+                            ],
+                            borderWidth: 2,
+                            borderRadius: 8,
+                            barPercentage: 0.7,
+                            categoryPercentage: 0.8
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    indexAxis: 'x',
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#fff',
+                                font: {
+                                    size: 14,
+                                    weight: '600'
+                                },
+                                padding: 20,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            },
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.8)',
+                                font: {
+                                    size: 12,
+                                    weight: '500'
+                                },
+                                padding: 10
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)',
+                                drawBorder: false
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#fff',
+                                font: {
+                                    size: 13,
+                                    weight: '500'
+                                }
+                            },
+                            grid: {
+                                display: false,
+                                drawBorder: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,14 @@
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints/
+
+## Python
+DeepChurn/DeepChurn/__pycache__/
+
+# Virtual Environment
+modelvenv/
+
+# Django
+*.log
+DeepChurn/DeepChurn/settings.py
+db.sqlite3
+db.sqlite3-journal
