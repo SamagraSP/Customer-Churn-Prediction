@@ -324,6 +324,34 @@ button:hover{
     padding:16px;
 }
 
+.chart-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+    margin-top:18px;
+    max-width:100%;
+}
+
+.chart-card{
+    background:rgba(255,255,255,.12);
+    border-radius:16px;
+    padding:18px;
+    min-height:320px;
+    max-height:360px;
+}
+
+.chart-card h4{
+    margin-bottom:14px;
+    color:#fff;
+    font-size:16px;
+}
+
+.chart-card canvas{
+    width:100%;
+    height:calc(100% - 34px);
+    max-height:320px;
+}
+
 .result-card h4{
     font-size:16px;
     margin-bottom:8px;
@@ -462,7 +490,7 @@ button:hover{
 
         <div class="form-group">
             <label>Customer ID</label>
-            <input type="text" name="customerID" placeholder="Customer ID">
+            <input type="text" name="customerID" placeholder="Customer ID" required>
         </div>
 
         <div class="form-group">
@@ -499,7 +527,7 @@ button:hover{
 
         <div class="form-group">
             <label>Tenure (Months)</label>
-            <input type="number" name="tenure" placeholder="Months">
+            <input type="number" name="tenure" placeholder="Months" min="1" required >
         </div>
 
         <div class="form-group">
@@ -611,12 +639,12 @@ button:hover{
 
         <div class="form-group">
             <label>Monthly Charges</label>
-            <input type="number" step="0.01" name="monthlyCharges" placeholder="Monthly Charges">
+            <input type="number" step="0.01" name="monthlyCharges" placeholder="Monthly Charges" min="0" required>
         </div>
 
         <div class="form-group">
             <label>Total Charges</label>
-            <input type="number" step="0.01" name="totalCharges" placeholder="Total Charges">
+            <input type="number" step="0.01" name="totalCharges" placeholder="Total Charges" min="0" required>
         </div>
 
     </div>
@@ -664,9 +692,15 @@ button:hover{
                 </div>
             </div>
 
-            <div style="background:rgba(255,255,255,.12); border-radius:16px; padding:18px; margin-top:16px;">
-                <h4 style="margin-bottom:16px;">Customer vs Average Churner Comparison</h4>
-                <canvas id="churnChart" style="max-height:300px;"></canvas>
+            <div class="chart-row">
+                <div class="chart-card">
+                    <h4>Customer vs Average Churner Comparison</h4>
+                    <canvas id="churnChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h4>Insight Trend: Customer vs Avg</h4>
+                    <canvas id="churnInsightChart"></canvas>
+                </div>
             </div>
 
             <div class="progress-strip">
@@ -722,90 +756,191 @@ button:hover{
         }
     });
 
-    // Chart.js - Customer vs Average Churner Bar Chart
+    // Chart.js - Customer vs Average Churner Visualizations
     const chartCanvas = document.getElementById('churnChart');
-    if (chartCanvas) {
-        const chartData = {{ chart_data|safe }};
-        
-        if (chartData) {
-            const ctx = chartCanvas.getContext('2d');
-            new Chart(ctx, {
-                type: 'bar',
+    const insightCanvas = document.getElementById('churnInsightChart');
+    const chartData = {{ chart_data|safe }};
+
+    if (chartCanvas && chartData) {
+        const labels = ['Monthly Charges', 'Tenure', 'Total Charges'];
+        const customerValues = [
+            chartData.monthly_charges.customer,
+            chartData.tenure.customer,
+            chartData.total_charges.customer
+        ];
+        const avgValues = [
+            chartData.monthly_charges.average_churner,
+            chartData.tenure.average_churner,
+            chartData.total_charges.average_churner
+        ];
+
+        const normalizedCustomer = customerValues.map((value, index) => {
+            const avg = avgValues[index] || 1;
+            return +(avg > 0 ? (value / avg * 100).toFixed(1) : 0);
+        });
+        const baseline100 = [100, 100, 100];
+
+        const ctx = chartCanvas.getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Current Customer (% of avg churner)',
+                        data: normalizedCustomer,
+                        backgroundColor: 'rgba(103, 232, 249, 0.85)',
+                        borderColor: '#67E8F9',
+                        borderWidth: 2,
+                        borderRadius: 10,
+                        barPercentage: 0.65,
+                        categoryPercentage: 0.7
+                    },
+                    {
+                        label: 'Avg Churner Baseline',
+                        data: baseline100,
+                        backgroundColor: 'rgba(251, 191, 36, 0.4)',
+                        borderColor: '#FBBF24',
+                        borderWidth: 2,
+                        borderRadius: 10,
+                        barPercentage: 0.65,
+                        categoryPercentage: 0.7
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#fff',
+                            font: {
+                                size: 13,
+                                weight: '600'
+                            },
+                            padding: 14,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        },
+                        position: 'top'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + context.parsed.y + '%';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 140,
+                        ticks: {
+                            color: 'rgba(255, 255, 255, 0.85)',
+                            font: {
+                                size: 12,
+                                weight: '500'
+                            },
+                            padding: 10,
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.12)',
+                            drawBorder: false
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            color: '#fff',
+                            font: {
+                                size: 13,
+                                weight: '500'
+                            }
+                        },
+                        grid: {
+                            display: false,
+                            drawBorder: false
+                        }
+                    }
+                }
+            }
+        });
+
+        if (insightCanvas) {
+            const insightCtx = insightCanvas.getContext('2d');
+            new Chart(insightCtx, {
+                type: 'line',
                 data: {
-                    labels: ['Monthly Charges ($)', 'Tenure (Months)'],
+                    labels: labels,
                     datasets: [
                         {
                             label: 'Current Customer',
-                            data: [
-                                chartData.monthly_charges.customer,
-                                chartData.tenure.customer
-                            ],
-                            backgroundColor: [
-                                'rgba(103, 232, 249, 0.8)',
-                                'rgba(103, 232, 249, 0.8)'
-                            ],
-                            borderColor: [
-                                '#67E8F9',
-                                '#67E8F9'
-                            ],
-                            borderWidth: 2,
-                            borderRadius: 8,
-                            barPercentage: 0.7,
-                            categoryPercentage: 0.8
+                            data: normalizedCustomer,
+                            borderColor: 'rgba(103, 232, 249, 1)',
+                            backgroundColor: 'rgba(103, 232, 249, 0.25)',
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: 5,
+                            pointBackgroundColor: '#67E8F9',
+                            borderWidth: 3
                         },
                         {
-                            label: 'Avg Churner Profile',
-                            data: [
-                                chartData.monthly_charges.average_churner,
-                                chartData.tenure.average_churner
-                            ],
-                            backgroundColor: [
-                                'rgba(251, 191, 36, 0.9)',
-                                'rgba(251, 191, 36, 0.9)'
-                            ],
-                            borderColor: [
-                                '#FBBF24',
-                                '#FBBF24'
-                            ],
-                            borderWidth: 2,
-                            borderRadius: 8,
-                            barPercentage: 0.7,
-                            categoryPercentage: 0.8
+                            label: 'Avg Churner',
+                            data: baseline100,
+                            borderColor: 'rgba(251, 191, 36, 1)',
+                            backgroundColor: 'rgba(251, 191, 36, 0.22)',
+                            fill: true,
+                            tension: 0.35,
+                            pointRadius: 5,
+                            pointBackgroundColor: '#FBBF24',
+                            borderWidth: 3
                         }
                     ]
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: true,
-                    indexAxis: 'x',
+                    maintainAspectRatio: false,
+                    aspectRatio: 1.4,
+                    aspectRatio: 1.4,
                     plugins: {
                         legend: {
                             labels: {
                                 color: '#fff',
                                 font: {
-                                    size: 14,
+                                    size: 13,
                                     weight: '600'
-                                },
-                                padding: 20,
-                                usePointStyle: true,
-                                pointStyle: 'circle'
-                            },
-                            position: 'top'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y + '%';
+                                }
+                            }
                         }
                     },
                     scales: {
                         y: {
                             beginAtZero: true,
+                            max: 140,
                             ticks: {
-                                color: 'rgba(255, 255, 255, 0.8)',
+                                color: 'rgba(255, 255, 255, 0.85)',
                                 font: {
                                     size: 12,
                                     weight: '500'
                                 },
-                                padding: 10
+                                padding: 10,
+                                callback: function(value) {
+                                    return value + '%';
+                                }
                             },
                             grid: {
-                                color: 'rgba(255, 255, 255, 0.1)',
+                                color: 'rgba(255, 255, 255, 0.12)',
                                 drawBorder: false
                             }
                         },

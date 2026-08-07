@@ -86,10 +86,12 @@ def churn(request):
     if show_result:
         monthly_charge_value = float(request.POST.get('monthlyCharges') or 0)
         tenure_value = int(request.POST.get('tenure') or 0)
+        total_charge_value = float(request.POST.get('totalCharges') or 0)
         
         # Average churner profile (estimated based on typical churn patterns)
         avg_monthly_charges = 74.5
         avg_tenure = 18
+        avg_total_charges = 2283.3
         
         chart_data = {
             'monthly_charges': {
@@ -99,6 +101,10 @@ def churn(request):
             'tenure': {
                 'customer': tenure_value,
                 'average_churner': avg_tenure
+            },
+            'total_charges': {
+                'customer': round(total_charge_value, 2),
+                'average_churner': avg_total_charges
             }
         }
 
