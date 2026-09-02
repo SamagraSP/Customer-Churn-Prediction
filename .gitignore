@@ -9,6 +9,6 @@ modelvenv/
 
 # Django
 *.log
-DeepChurn/DeepChurn/settings.py
+DeepChurn/.env
 db.sqlite3
 db.sqlite3-journal
