@@ -2,7 +2,6 @@ from pathlib import Path
 from django.shortcuts import render
 from tensorflow.keras.models import load_model
 import pandas as pd
-import matplotlib.pyplot as plt
 import pickle
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -15,6 +14,88 @@ with open(BASE_DIR / 'standardscaler.pkl', 'rb') as s:
 
 model = load_model(BASE_DIR / 'ANN_model.keras')
 
+LOW_RISK_THRESHOLD = 0.30
+HIGH_RISK_THRESHOLD = 0.60
+
+FIELD_NAMES = [
+    'customerID', 'gender', 'SeniorCitizen', 'Partner', 'Dependents',
+    'tenure', 'phoneService', 'multipleLines', 'internetService',
+    'onlineSecurity', 'onlineBackup', 'deviceProtection', 'techSupport',
+    'streamingTv', 'streamingMovies', 'contract', 'paperlessBilling',
+    'paymentMethod', 'monthlyCharges', 'totalCharges',
+]
+
+
+def validate_submission(data):
+    errors = {}
+    for field in FIELD_NAMES:
+        if not data.get(field, '').strip():
+            errors[field] = 'This field is required.'
+
+    customer_id = data.get('customerID', '').strip()
+    if customer_id and len(customer_id) > 64:
+        errors['customerID'] = 'Use 64 characters or fewer.'
+
+    try:
+        tenure = int(data.get('tenure', ''))
+        if tenure < 0 or tenure > 120:
+            errors['tenure'] = 'Enter a tenure between 0 and 120 months.'
+    except (TypeError, ValueError):
+        errors['tenure'] = 'Enter a whole number of months.'
+
+    numeric_values = {}
+    for field in ('monthlyCharges', 'totalCharges'):
+        try:
+            value = float(data.get(field, ''))
+            if value < 0 or value > 1000000:
+                errors[field] = 'Enter a value between 0 and 1,000,000.'
+            numeric_values[field] = value
+        except (TypeError, ValueError):
+            errors[field] = 'Enter a valid non-negative amount.'
+
+    if not errors.get('tenure') and not errors.get('monthlyCharges') and not errors.get('totalCharges'):
+        expected_total = tenure * numeric_values['monthlyCharges']
+        if numeric_values['totalCharges'] > expected_total + numeric_values['monthlyCharges'] * 3 + 100:
+            errors['totalCharges'] = 'Total charges are unusually high for this tenure and monthly charge.'
+
+    return errors
+
+
+def build_risk_factors(data):
+    factors = []
+    indicators = [
+        ('contract', 'Month-to-month contract', data.get('contract') == 'Month-to-month'),
+        ('monthlyCharges', 'Higher monthly charges', float(data.get('monthlyCharges', 0)) >= 80),
+        ('tenure', 'Short tenure', int(data.get('tenure', 0)) <= 12),
+        ('internetService', 'Fiber optic internet service', data.get('internetService') == 'Fiber optic'),
+        ('paymentMethod', 'Electronic check payment', data.get('paymentMethod') == 'Electronic check'),
+        ('onlineSecurity', 'No online security add-on', data.get('onlineSecurity') == 'No'),
+        ('techSupport', 'No tech support add-on', data.get('techSupport') == 'No'),
+        ('deviceProtection', 'No device protection add-on', data.get('deviceProtection') == 'No'),
+        ('onlineBackup', 'No online backup add-on', data.get('onlineBackup') == 'No'),
+    ]
+    for field, label, applies in indicators:
+        if applies:
+            factors.append({'label': label, 'field': field})
+    return factors
+
+
+def build_recommendations(data, risk_class):
+    recommendations = []
+    if risk_class == 'high-risk':
+        recommendations.append('Prioritize proactive customer contact and a targeted retention offer.')
+    elif risk_class == 'medium-risk':
+        recommendations.append('Consider a timely engagement check-in and a relevant retention incentive.')
+    else:
+        recommendations.append('Continue good service and consider loyalty-focused engagement.')
+    if data.get('contract') == 'Month-to-month':
+        recommendations.append('Offer a clear longer-term contract option with an appropriate incentive.')
+    if data.get('techSupport') == 'No' or data.get('onlineSecurity') == 'No':
+        recommendations.append('Review whether technical support or online security add-ons would improve value.')
+    if float(data.get('monthlyCharges', 0)) >= 80:
+        recommendations.append('Review pricing and plan fit before making an offer.')
+    return recommendations
+
 def churn(request):
     predict = None
     show_result = False
@@ -22,71 +103,71 @@ def churn(request):
     risk_class = 'low-risk'
     summary = 'The system will display the churn risk level and supporting details here after submission.'
     recommendation = 'Recommended action: Review customer engagement strategy.'
-    confidence = 82
+    probability = None
     customer_id = '—'
     contract = '—'
     monthly_charges = '—'
     internet_service = '—'
 
-    if request.method == 'POST':
+    form_values = request.POST.dict() if request.method == 'POST' else {}
+    errors = validate_submission(form_values) if request.method == 'POST' else {}
+    prediction_data = None
+
+    if request.method == 'POST' and not errors:
         customer_data = pd.DataFrame([{
-            'customerID': request.POST.get('customerID'),
-            'gender': request.POST.get('gender'),
-            'SeniorCitizen': int(request.POST.get('SeniorCitizen')),
-            'Partner': request.POST.get('Partner'),
-            'Dependents': request.POST.get('Dependents'),
-            'tenure': int(request.POST.get('tenure')),
-            'PhoneService': request.POST.get('phoneService'),
-            'MultipleLines': request.POST.get('multipleLines'),
-            'InternetService': request.POST.get('internetService'),
-            'OnlineSecurity': request.POST.get('onlineSecurity'),
-            'OnlineBackup': request.POST.get('onlineBackup'),
-            'DeviceProtection': request.POST.get('deviceProtection'),
-            'TechSupport': request.POST.get('techSupport'),
-            'StreamingTV': request.POST.get('streamingTv'),
-            'StreamingMovies': request.POST.get('streamingMovies'),
-            'Contract': request.POST.get('contract'),
-            'PaperlessBilling': request.POST.get('paperlessBilling'),
-            'PaymentMethod': request.POST.get('paymentMethod'),
-            'MonthlyCharges': float(request.POST.get('monthlyCharges')),
-            'TotalCharges': float(request.POST.get('totalCharges')),
+            'customerID': form_values['customerID'], 'gender': form_values['gender'],
+            'SeniorCitizen': int(form_values['SeniorCitizen']), 'Partner': form_values['Partner'],
+            'Dependents': form_values['Dependents'], 'tenure': int(form_values['tenure']),
+            'PhoneService': form_values['phoneService'], 'MultipleLines': form_values['multipleLines'],
+            'InternetService': form_values['internetService'], 'OnlineSecurity': form_values['onlineSecurity'],
+            'OnlineBackup': form_values['onlineBackup'], 'DeviceProtection': form_values['deviceProtection'],
+            'TechSupport': form_values['techSupport'], 'StreamingTV': form_values['streamingTv'],
+            'StreamingMovies': form_values['streamingMovies'], 'Contract': form_values['contract'],
+            'PaperlessBilling': form_values['paperlessBilling'], 'PaymentMethod': form_values['paymentMethod'],
+            'MonthlyCharges': float(form_values['monthlyCharges']), 'TotalCharges': float(form_values['totalCharges']),
         }])
 
         customer_data = customer_data.drop('customerID', axis=1)
         new_data = ct.transform(customer_data)
         standard_data = sc.transform(new_data)
-        prediction = model.predict(standard_data)
-        per_value= prediction[0][0]*100
-        percentage= round(per_value, 2)
-        predict = int(prediction[0][0] > 0.5)
+        prediction = model.predict(standard_data, verbose=0)
+        probability = round(float(prediction[0][0]), 4)
+        percentage = round(probability * 100, 1)
+        predict = int(probability >= HIGH_RISK_THRESHOLD)
 
         show_result = True
         customer_id = request.POST.get('customerID') or 'Unknown'
         contract = request.POST.get('contract') or '—'
-        monthly_charges = f"${float(request.POST.get('monthlyCharges') or 0):.2f}"
-        internet_service = request.POST.get('internetService') or '—'
+        monthly_charges = f"${float(form_values['monthlyCharges']):.2f}"
+        internet_service = form_values['internetService']
 
-        if predict == 1:
-            risk_label = 'HIGH RISK'
-            risk_class = 'high-risk'
-            summary = 'The customer is likely to churn, with the profile showing strong indicators of potential customer loss. Current engagement patterns and account signals suggest an elevated churn risk that requires proactive attention.'
-            recommendation = 'Recommended actions include reviewing recent customer interactions, identifying key drivers of dissatisfaction, addressing unresolved concerns, and initiating targeted retention efforts to improve the likelihood of maintaining the relationship.'
-            confidence = percentage
+        if probability >= HIGH_RISK_THRESHOLD:
+            risk_label, risk_class = 'HIGH RISK', 'high-risk'
+            summary = 'This customer shows a strong likelihood of churn. Immediate retention action is recommended.'
+        elif probability >= LOW_RISK_THRESHOLD:
+            risk_label, risk_class = 'MEDIUM RISK', 'medium-risk'
+            summary = 'This customer shows moderate churn risk. Proactive engagement may reduce the likelihood of cancellation.'
         else:
-            risk_label = 'LOW RISK'
-            risk_class = 'low-risk'
-            summary = 'The customer is unlikely to churn, with the profile showing strong indicators of continued engagement and account stability. Current usage patterns, customer interactions, and overall account health suggest a low risk of customer loss.'
-            recommendation = 'The customer demonstrates positive engagement and ongoing value realization, indicating a strong likelihood of maintaining the relationship. Continued monitoring and proactive engagement are recommended to sustain satisfaction and support long-term retention.Maintain loyalty offers and continue proactive engagement.'
-            confidence = (100-percentage)
+            risk_label, risk_class = 'LOW RISK', 'low-risk'
+            summary = 'This customer currently appears relatively stable. Continue good service and consider loyalty-focused engagement.'
+
+        factors = build_risk_factors(form_values)
+        recommendations = build_recommendations(form_values, risk_class)
+        recommendation = recommendations[0]
+        prediction_data = {
+            'label': risk_label, 'probability': probability, 'percentage': percentage,
+            'risk_class': risk_class, 'summary': summary, 'risk_factors': factors,
+            'recommendations': recommendations,
+        }
 
     
 
     # Calculate average churner profile for comparison
     chart_data = None
     if show_result:
-        monthly_charge_value = float(request.POST.get('monthlyCharges') or 0)
-        tenure_value = int(request.POST.get('tenure') or 0)
-        total_charge_value = float(request.POST.get('totalCharges') or 0)
+        monthly_charge_value = float(form_values['monthlyCharges'])
+        tenure_value = int(form_values['tenure'])
+        total_charge_value = float(form_values['totalCharges'])
         
         # Average churner profile (estimated based on typical churn patterns)
         avg_monthly_charges = 74.5
@@ -115,10 +196,20 @@ def churn(request):
         'risk_class': risk_class,
         'summary': summary,
         'recommendation': recommendation,
-        'confidence': confidence,
+        'probability': probability,
+        'prediction_data': prediction_data,
+        'errors': errors,
+        'form_values': form_values,
         'customer_id': customer_id,
         'contract': contract,
         'monthly_charges': monthly_charges,
         'internet_service': internet_service,
         'chart_data': chart_data,
+        'model_info': {
+            'algorithm': 'Artificial Neural Network',
+            'dataset': 'Telco Customer Churn',
+            'features': '29 engineered features',
+            'prediction_type': 'Binary churn classification',
+            'version': 'Not specified',
+        },
     })
