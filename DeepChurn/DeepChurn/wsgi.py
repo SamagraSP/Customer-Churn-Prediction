@@ -18,7 +18,7 @@ path_to_add = Path(__file__).resolve().parent
 if str(path_to_add) not in sys.path:
     sys.path.append(str(path_to_add))
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'DeepChurn.')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'DeepChurn.settings')
 
 application = get_wsgi_application()
 
