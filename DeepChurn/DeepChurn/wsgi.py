@@ -6,7 +6,7 @@ It exposes the WSGI callable as a module-level variable named ``application``.
 For more information on this file, see
 https://docs.djangoproject.com/en/5.2/howto/deployment/wsgi/
 """
-
+'''
 import os
 import sys
 from pathlib import Path
@@ -24,4 +24,27 @@ application = get_wsgi_application()
 
 # Alias for Vercel WSGI entry point
 app = application
+'''
 
+import os
+import sys
+from pathlib import Path
+from django.core.wsgi import get_wsgi_application
+
+# Path to the directory where wsgi.py and settings.py live
+CURRENT_DIR = Path(__file__).resolve().parent
+
+# Path to the outer repository root
+REPO_ROOT = CURRENT_DIR.parent.parent
+
+# Inject both paths to ensure Python finds 'settings' or 'DeepChurn.settings'
+for p in [str(CURRENT_DIR), str(REPO_ROOT), str(CURRENT_DIR.parent)]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings')
+
+application = get_wsgi_application()
+
+# Required entry point alias for Vercel
+app = application
