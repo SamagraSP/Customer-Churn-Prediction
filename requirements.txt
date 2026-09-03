@@ -8,3 +8,6 @@ scikit-learn==1.9.0
 joblib
 
 tensorflow==2.21.0
+
+gunicorn
+uvicorn
