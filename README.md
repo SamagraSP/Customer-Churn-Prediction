@@ -1,5 +1,8 @@
 # Customer Churn Prediction — Full-Stack Machine Learning Application
 
+🚀 **Live Demo:** [Try the deployed application](https://customer-churn-prediction-site.onrender.com)
+
+
 An end-to-end **Customer Churn Prediction web application** that uses an **Artificial Neural Network (ANN)** to predict whether a customer is likely to churn based on their demographic, account, and service-related information.
 
 The project combines a **TensorFlow/Keras machine learning model** with a **Django backend** and a responsive **HTML, CSS, and JavaScript frontend**. Users can enter customer information through a web form and receive an instant churn prediction along with interactive insights comparing the customer with average churner behavior.
